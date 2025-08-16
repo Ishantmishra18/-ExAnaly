@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../utils/api';
 import { useUser } from '../Context/userContext';
 import Sidelog from './sidelog';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FcGoogle } from "react-icons/fc";
 import Loading from './loading';
 import { useTheme } from '../Context/themeContext';
+import { jwtDecode } from 'jwt-decode';
 
 const Login = () => {
   const [form, setForm] = useState({ username: '', password: '' });
@@ -15,6 +17,40 @@ const Login = () => {
   const { setUser } = useUser();
   const [eye, setEye] = useState(false);
   const { isDark } = useTheme();
+
+  // Check for Google auth response in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const error = urlParams.get('error');
+
+    if (token) {
+      handleGoogleLogin(token);
+    } else if (error) {
+      setError(error === 'access_denied' ? 
+        'Google login was cancelled' : 
+        'Google login failed');
+    }
+  }, []);
+
+  const handleGoogleLogin = async (token) => {
+    try {
+      // Store the token in cookies/localStorage
+      document.cookie = `token=${token}; path=/; secure; samesite=none; max-age=${24 * 60 * 60}`; 
+      
+      // Decode token to get user info
+      const decoded = jwtDecode(token);
+      
+      // Set user in context
+      setUser(decoded);
+      
+      // Redirect to home
+      navigate('/');
+    } catch (err) {
+      setError('Failed to process Google login');
+      console.error('Google login error:', err);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,10 +68,18 @@ const Login = () => {
     }
   };
 
+  const handleGoogleAuth = () => {
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+  };
+
   return (
-    <div className={`min-h-screen w-full flex flex-col lg:flex-row ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+    <div className={`min-h-screen w-full flex relative flex-col lg:flex-row ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
       {isLoading && <Loading/>}
-      
+      {/*home and admin btn*/}
+      <div className="absolute top-0 p-6 left-0 flex gap-4 z-30" >
+        <Link to='/' className="rounded-xl text-sm md:text-xl px-3 md:px-5 py-2 bg-gray-300">Home</Link>
+         <Link to='/admin' className="rounded-xl text-sm md:text-xl px-3 md:px-5 py-2 bg-gray-300">Admin</Link>
+      </div>
       {/* Sidebar - hidden on mobile, shown on larger screens */}
       <div className="">
         <Sidelog/>
@@ -101,10 +145,31 @@ const Login = () => {
           {/* Submit Button */}
           <button
             type="submit" 
-            className='w-full p-4 mt-6 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 transition-colors duration-300'
+            className='w-full cursor-pointer p-4 mt-6 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 transition-colors duration-300'
           >
             Login
           </button>
+
+          {/* Divider */}
+          <div className="flex items-center my-6">
+            <div className={`flex-1 h-px ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+            <span className={`px-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>OR</span>
+            <div className={`flex-1 h-px ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+          </div>
+
+          {/* Google Sign-in Button */}
+          <a
+            href={`${import.meta.env.VITE_BACKEND_URL}/auth/google`}
+            
+            className={`flex items-center cursor-pointer justify-center gap-3 w-full p-3 rounded-md transition-all duration-200 ${
+              isDark 
+                ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            } border`}
+          >
+            <FcGoogle className="text-2xl" />
+            <span className="font-medium">Continue with Google</span>
+          </a>
           
           {/* Sign Up Link */}
           <p className={`mt-6 text-center ${
